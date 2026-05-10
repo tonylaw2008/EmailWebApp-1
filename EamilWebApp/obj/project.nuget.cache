@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "J0m4FKZg0Pg=",
+  "dgSpecHash": "eC6wQqvI+JA=",
   "success": true,
-  "projectFilePath": "C:\\Users\\Administrator\\Desktop\\CCCC\\EmailWebApp\\EamilWebApp\\EamilWebApp.csproj",
+  "projectFilePath": "D:\\APP\\DGX_NET6\\STAR_NEW\\EmailWebApp\\EamilWebApp\\EamilWebApp.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\Administrator\\.nuget\\packages\\bouncycastle.cryptography\\2.6.2\\bouncycastle.cryptography.2.6.2.nupkg.sha512",
     "C:\\Users\\Administrator\\.nuget\\packages\\log4net\\2.0.13\\log4net.2.0.13.nupkg.sha512",

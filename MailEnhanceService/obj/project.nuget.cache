@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "oXWZ1mokR9w=",
+  "dgSpecHash": "7hkvdlPs7cs=",
   "success": true,
-  "projectFilePath": "C:\\Users\\Administrator\\Desktop\\CCCC\\EmailWebApp\\MailEnhanceService\\MailEnhanceService.csproj",
+  "projectFilePath": "D:\\APP\\DGX_NET6\\STAR_NEW\\EmailWebApp\\MailEnhanceService\\MailEnhanceService.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\Administrator\\.nuget\\packages\\bouncycastle.cryptography\\2.6.2\\bouncycastle.cryptography.2.6.2.nupkg.sha512",
     "C:\\Users\\Administrator\\.nuget\\packages\\log4net\\2.0.13\\log4net.2.0.13.nupkg.sha512",

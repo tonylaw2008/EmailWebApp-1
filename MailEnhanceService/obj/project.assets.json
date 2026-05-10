@@ -2473,11 +2473,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\Administrator\\Desktop\\CCCC\\EmailWebApp\\MailEnhanceService\\MailEnhanceService.csproj",
+      "projectUniqueName": "D:\\APP\\DGX_NET6\\STAR_NEW\\EmailWebApp\\MailEnhanceService\\MailEnhanceService.csproj",
       "projectName": "MailEnhanceService",
-      "projectPath": "C:\\Users\\Administrator\\Desktop\\CCCC\\EmailWebApp\\MailEnhanceService\\MailEnhanceService.csproj",
+      "projectPath": "D:\\APP\\DGX_NET6\\STAR_NEW\\EmailWebApp\\MailEnhanceService\\MailEnhanceService.csproj",
       "packagesPath": "C:\\Users\\Administrator\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\Administrator\\Desktop\\CCCC\\EmailWebApp\\MailEnhanceService\\obj\\",
+      "outputPath": "D:\\APP\\DGX_NET6\\STAR_NEW\\EmailWebApp\\MailEnhanceService\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
         "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"

@@ -10,7 +10,7 @@
     "fromMailAddress": "service1@xguard.hk",
     "fromMailDisplayName": "Service Center Of Xguard",
     "senderUserName": "955ced001@smtp-brevo.com",
-    "senderUserPassword": "xsmtpsib-dfacfc38a44a9b6b991e48566e80c7f81f8d6ad061cad3e4066d61d214a3a7c3-xnGQXTuF1vLNOuxX", // 从 Brevo 控制台获取的 SMTP KEY 密钥，不是登录密码
+    "senderUserPassword": "xxxxxxxx", // 从 Brevo 控制台获取的 SMTP KEY 密钥，不是登录密码 或 Notion筆記
     "Remarks": "[mailTool:System.Net.Mail.SmtpClient=0; MailKit.Net.Smtp.SmtpClient=1] [StartTLS=587;SSL=465] This is the brevo.com email account used for sending emails from XGuard."
   }
 ]

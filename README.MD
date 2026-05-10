@@ -5,7 +5,11 @@
 
 ## 💖💖如何使用： [如何使用發郵件接口服務.MD](如何使用發郵件接口服務.MD) 
 
+🟫測試要注意：
 
+```
+// 从 Brevo 控制台获取的 SMTP KEY 密钥，不是登录密码 xsmtpsib-dfacfc38a44。。。14a3a7c3-xnGQXTuF1vLNOuxX
+```
 
 Version: 1.0.0
 
