@@ -256,7 +256,8 @@
             txtSenderUserPassword.Name = "txtSenderUserPassword";
             txtSenderUserPassword.Size = new Size(157, 23);
             txtSenderUserPassword.TabIndex = 24;
-            toolTip1.SetToolTip(txtSenderUserPassword, "Smtp Server login Password");
+            txtSenderUserPassword.Text = "SMTP KEY（Password）";
+            toolTip1.SetToolTip(txtSenderUserPassword, "Smtp Server login Password, // 从 Brevo 控制台获取的 SMTP 密钥，不是登录密码, 包括其它的，都不會是賬號密碼，而是一串密匙。");
             // 
             // txtSenderUserName
             // 

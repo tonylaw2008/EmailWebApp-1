@@ -1,0 +1,37 @@
+﻿
+<div class="container mt-2">
+    <div class="row justify-content-center">
+        <div class="col-md-10">
+            <div class="card shadow-sm">
+                <div class="card-header bg-warning text-white">
+                    <h4 class="mb-0"><i class="fas fa-user me-1"></i> 用戶認證</h4>
+                </div>
+                <div class="card-body">
+                    <form method="get" id="mailForm" asp-action="EmailEditor" asp-controller="Home">
+                        <!-- 所屬公司ID 與 Token -->
+                        <div class="mb-3 d-inline input-group">
+                            <label for="mainComId" class="form-label" data-bs-toggle="tooltip"
+                                   data-bs-placement="top" title="MainComId may be consider as oganation/user/shop/app/utilities">MainComId</label>
+                            <div class="input-group">
+                                <div class="input-group-prepend">
+                                    <input type="text" class="form-control col-2" id="mainComId" name="mainComId" value="@ViewBag.MainComId" required>
+                                </div>
+                                <input type="text" class="form-control col-10 input-group-append"
+                                       id="token" name="token" value="@ViewBag.AuthenticationCode"
+                                       placeholder="Authentication Code From Appsettings.json" required>
+                            </div>
+                        </div>
+                         
+                        <div class="d-grid gap-1 d-md-flex justify-content-md-end">
+                            <button type="submit" class="btn btn-primary btn-md mt-1">
+                                <i class="fas fa-ok"></i> OK
+                            </button>
+                        </div>
+                    </form>
+
+                    <div id="resultMessage" class="mt-3"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

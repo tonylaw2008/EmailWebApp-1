@@ -3,7 +3,7 @@
   <PropertyGroup>
 	 <Nullable>disable</Nullable>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net6.0</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
@@ -43,7 +43,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="MailKit" Version="4.13.0" />
+    <PackageReference Include="MailKit" Version="4.16.0" />
     <PackageReference Include="Microsoft.AspNetCore.Http.Abstractions" Version="2.3.0" />
     <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="6.0.3" />
     <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="6.0.1" />
@@ -57,4 +57,21 @@
     <PackageReference Include="System.Runtime.Caching" Version="4.7.0" />
   </ItemGroup>
 
+  <!--避免發佈同文件衝突-->
+  <ItemGroup>
+	    <!-- 排除 appsettings.json 發布 -->
+	    <Content Remove="appsettings.json" />
+	    <None Include="appsettings.json">
+		    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+		    <CopyToPublishDirectory>Never</CopyToPublishDirectory>
+	    </None>
+
+	    <!-- 排除 log4net.config 發布 -->
+	    <Content Remove="log4net.config" />
+	    <None Include="log4net.config">
+		    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+		    <CopyToPublishDirectory>Never</CopyToPublishDirectory>
+	    </None>
+  </ItemGroup>
+	
 </Project>

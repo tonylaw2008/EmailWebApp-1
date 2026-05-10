@@ -606,7 +606,7 @@ namespace MailEnhanceService
             catch (MailKit.Security.AuthenticationException authEx)
             {
                 lastException = authEx;
-                _logger.LogError(authEx, "[AuthenticationException] 驗證失敗，請檢查使用者名稱和密碼");
+                _logger.LogError(authEx, $"[AuthenticationException] {_senderAccount.SenderServerHost} 驗證失敗，請檢查使用者名稱{_senderAccount.SenderUserName}和密碼{_senderAccount.SenderUserPassword}");
             }
             catch (System.Net.Sockets.SocketException socketEx)
             {

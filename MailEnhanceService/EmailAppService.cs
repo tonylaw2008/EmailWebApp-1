@@ -108,7 +108,7 @@ namespace MailEnhanceService
         {
             #region BEGIN TASK RUN
             //============================================================================================================================== 
-
+            bool anySuccess = false; // 定义一个变量来跟踪是否有任何邮件发送成功
             foreach (var item in mailToList)
             {
                 Stopwatch sw = new Stopwatch();
@@ -151,7 +151,9 @@ namespace MailEnhanceService
                     foreach (var item1OfSenderAccount in SenderEmailAccountList)
                     {
                         bool succ = await emailEnhanceHelper.SendMailsync(item1OfSenderAccount,toMailAddress, subjectInfo, bodyRawContentIfHave, attachedFilesIfHave);
-                         
+
+                        if (succ) anySuccess = true;
+
                         if (succ)
                         {
                             _logger.LogInformation($"Sending Email the first time（{toMailAddress}） SUCC = {succ}......");
@@ -175,7 +177,7 @@ namespace MailEnhanceService
                 }
             }
 
-            return true;
+            return anySuccess;
 
             #endregion END TASK RUN
         }

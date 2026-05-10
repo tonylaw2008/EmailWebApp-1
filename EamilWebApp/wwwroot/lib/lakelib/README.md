@@ -1,0 +1,55 @@
+# Lake
+
+[![CI](https://github.com/lakejs/lake/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/lakejs/lake/actions)
+[![npm](https://img.shields.io/npm/v/lakelib)](https://www.npmjs.com/package/lakelib)
+[![downloads](https://img.shields.io/npm/dm/lakelib)](https://www.npmjs.com/package/lakelib)
+
+---
+
+Lake is a rich text editor built for modern applications that require content creation like blog posts, user comments, and email composition. It aims to provide as many features as possible through a simple structure while remaining free for commercial use.
+
+[Examples](https://lakejs.org/examples/) · [Getting started](https://lakejs.org/guide/) · [Reference](https://lakejs.org/reference/)
+
+## Development
+
+To customize Lake or contribute to its development, follow these steps to set up your local environment:
+
+``` bash
+# Clone the repository
+git clone https://github.com/lakejs/lake.git
+
+# Install dependencies
+pnpm install
+
+# Start the development server
+pnpm dev
+```
+
+Once the server is running, visit `http://localhost:8080/examples/` to try the demos.
+
+## Testing
+
+Because Lake relies on various browser APIs, tests must be executed in a real browser environment. You can choose one of the following methods:
+
+* Open `http://localhost:8080/tests/` to run tests directly in your browser.
+
+* Run `pnpm test` to execute the test suite in a headless browser via the command line.
+
+## License
+
+Lake is released under the [MIT](https://github.com/lakejs/lake/blob/main/LICENSE) license. We also stand on the shoulders of giants. Below are the licenses for our key dependencies:
+
+| Dependency | License | Author |
+| -------------  | ------------- | ------------- |
+| [Phosphor Icons](https://phosphoricons.com/) | MIT | Tobias Fried |
+| [Fluent Icons](https://fluenticons.co/) | MIT | Microsoft |
+| [CodeMirror](https://codemirror.net/) | MIT | Marijn Haverbeke |
+| [debounce](https://github.com/sindresorhus/debounce) | MIT | Sindre Sorhus |
+| [EventEmitter3](https://github.com/primus/eventemitter3) | MIT | Arnout Kazemier |
+| [fast-deep-equal](https://github.com/epoberezkin/fast-deep-equal) | MIT | Evgeny Poberezkin |
+| [Idiomorph](https://github.com/bigskysoftware/idiomorph) | BSD 2-Clause | Big Sky Software |
+| [is-hotkey](https://github.com/ianstormtaylor/is-hotkey) | MIT | Ian Storm Taylor |
+| [KaTeX](https://katex.org/) | MIT | Khan Academy |
+| [rc-upload](https://github.com/react-component/upload) | MIT | Ant Design Team |
+| [PhotoSwipe](https://photoswipe.com/) | MIT | Dmitry Semenov |
+| [typesafe-i18n](https://github.com/ivanhofer/typesafe-i18n) | MIT | Hofer Ivan |

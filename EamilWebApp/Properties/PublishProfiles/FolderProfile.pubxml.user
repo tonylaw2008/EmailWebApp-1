@@ -1,0 +1,9 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!-- https://go.microsoft.com/fwlink/?LinkID=208121. -->
+<Project>
+  <PropertyGroup>
+    <_PublishTargetUrl>D:\APP\DGX_NET6\STAR_NEW\EmailWebApp\EamilWebApp\bin\Release\net6.0\publish\</_PublishTargetUrl>
+    <History>False|2026-05-10T14:59:53.0185786Z||;False|2026-05-10T22:59:18.1260484+08:00||;True|2026-05-10T22:57:52.0306009+08:00||;True|2026-05-10T22:55:33.2564134+08:00||;False|2026-05-10T22:52:45.1890535+08:00||;False|2026-05-10T22:45:24.7919308+08:00||;False|2026-05-10T22:39:01.3940887+08:00||;False|2026-05-10T22:35:38.1770645+08:00||;False|2026-05-10T22:19:51.5498778+08:00||;False|2026-05-09T18:59:42.0094008+08:00||;False|2026-05-09T18:58:37.9315814+08:00||;</History>
+    <LastFailureDetails />
+  </PropertyGroup>
+</Project>

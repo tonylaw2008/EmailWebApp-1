@@ -1,15 +1,32 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
-    <TargetFramework>net6.0</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
   </PropertyGroup>
 
   <ItemGroup>
+    <Content Remove="Config\SenderEmailAccountList_6000014 - 複製.json" />
+    <Content Remove="Config\SenderEmailAccountList_6000014.json" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="Config\SenderEmailAccountList_6000014 - 複製.json" />
+    <None Include="Config\SenderEmailAccountList_6000014.json" />
+    <None Include="MailEnhanceService.csproj" />
+    <None Include="MailEnhanceService.csproj.user" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Logging.Log4Net.AspNetCore" Version="6.1.0" />
     <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.21.0" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MailEnhanceService\MailEnhanceService.csproj" />
   </ItemGroup>
 
 </Project>

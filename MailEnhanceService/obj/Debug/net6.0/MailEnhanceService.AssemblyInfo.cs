@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("MailEnhanceService")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0..0822")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+5512157110038b480be35e9a381ef0c6dc691b67")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+71059a0d83511b1d993120efb228cd09535fadb0")]
 [assembly: System.Reflection.AssemblyProductAttribute("MailEnhanceService")]
 [assembly: System.Reflection.AssemblyTitleAttribute("MailEnhanceService")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

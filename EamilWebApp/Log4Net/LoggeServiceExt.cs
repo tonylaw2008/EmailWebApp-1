@@ -12,6 +12,7 @@ namespace EamilWebApp
     public static class LoggerServiceExt
     {
         /// 使用log4net配置
+        /// Usage: app.UseLog4net();
         /// <param name="app"></param>
         /// <returns></returns>
         public static IApplicationBuilder UseLog4net(this IApplicationBuilder app)

@@ -1,0 +1,23 @@
+{
+  "version": "3.0",
+  "defaultProvider": "cdnjs",
+  "libraries": [
+    {
+      "library": "jquery@3.7.1",
+      "destination": "wwwroot/lib/jquery/",
+      "files": [
+        "jquery.min.js",
+        "jquery.js",
+        "jquery.min.map",
+        "jquery.slim.js",
+        "jquery.slim.min.js",
+        "jquery.slim.min.map"
+      ]
+    },
+    {
+      "provider": "jsdelivr",
+      "library": "lakelib@0.4.6",
+      "destination": "wwwroot/lib/lakelib/"
+    }
+  ]
+}

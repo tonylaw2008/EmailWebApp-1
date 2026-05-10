@@ -10,5 +10,6 @@
 *.1
 bin/
 obj/
+EamilWebApp/wwwroot/uploads
 EMAIL賬號配置程式/
 README_IMGs/应用程序数据库生成工具 操作说明Ver3.jpg
