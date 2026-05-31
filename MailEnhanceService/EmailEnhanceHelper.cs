@@ -1,29 +1,30 @@
-﻿using System;
-using System.Diagnostics.CodeAnalysis;
+﻿using MailKit;
+//MailKit
+using MailKit.Net.Smtp;
+using MailKit.Security;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using MimeKit;
+using MimeKit.Text;
+using Newtonsoft.Json;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Net;
 using System.Net.Mail;
 using System.Net.Mime;
+using System.Net.Security;
+using System.Runtime.Caching;
 using System.Security;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
-using Newtonsoft.Json;
-//MailKit
-using MailKit.Net.Smtp;
-using MailKit;
-using MimeKit;
-using System.Security.Cryptography.X509Certificates;
-using MimeKit.Text;
-using MailKit.Security;
-using Microsoft.Extensions.Caching.Memory;
-using System.Runtime.Caching;
-using Microsoft.Extensions.Hosting;
-using System.Net.Security;
+ 
 
 
 namespace MailEnhanceService
@@ -39,12 +40,19 @@ namespace MailEnhanceService
         REGISTER = 0,
         FORGET_PASSWORD = 1,   
         PRIVACY_CONTENT = 3
-    } 
+    }
 
+    /// <summary>
+    /// 選擇不同的SMTP發送平台
+    /// 邏輯上都是基於SMTP協議的發送方式，
+    /// 但是考慮到不同平台接口的區別，分別獨立的4個函數，以靈活應對不同情況。 
+    /// </summary>
     public enum MailToolEnum
     {
         SYSTEM_NET_MAIL_SMTP = 0,
-        MAIL_KIT_SMTP = 1
+        MAIL_KIT_SMTP = 1,
+        QQ_SMTP = 2,
+        OUTLOOK_SMTP = 3
     }
 
     /// <summary>
@@ -380,6 +388,8 @@ namespace MailEnhanceService
         /// <returns></returns>
         private async Task<bool> SendMailKitAsynchronous()
         {
+            _logger.LogInformation("[func::SendMailKitAsynchronous] Tool: MailKit to send SMPT email or duksend api to send email.");
+
             if (_senderAccount == null)
             {
                 _logger.LogError("[func::SendMailKitAsynchronous] SenderAccount is null. Please initialize SenderAccount before sending email.");
@@ -648,6 +658,145 @@ namespace MailEnhanceService
         }
 
         /// <summary>
+        /// SendQQAsynchronous 專用發送單元
+        /// 其實和MailKit的發送單元邏輯基本一致，
+        /// 主要區別在於：SendQQAsynchronous 可以使用API KEY的方式進行身份驗證， 或者直接使用SMTP協議方式發送。 
+        /// Core of the email sending unit (default)
+        /// </summary>
+        private async Task<bool> SendQQAsynchronous()
+        {
+            _logger.LogInformation("[func::SendQQAsynchronous] 发送QQ邮箱（SMTP）邮件");
+
+            if (_senderAccount == null)
+            {
+                _logger.LogError("[func::SendQQAsynchronous] SenderAccount 不能为空");
+                return false;
+            }
+
+            // 强制适配QQ邮箱SMTP配置（也可从SenderAccount读取，建议配置化）
+            //_senderAccount.SenderServerHost = "smtp.qq.com";
+            //_senderAccount.SenderServerHostPort = _senderAccount.EnableSSL ? 465 : 587;
+            //_senderAccount.EnableSSL = _senderAccount.SenderServerHostPort == 465;
+            //_senderAccount.EnableTSL = _senderAccount.SenderServerHostPort == 587;
+
+            Stopwatch sw = new Stopwatch();
+            sw.Start();
+            bool sendSuccess = false;
+            Exception? lastException = null;
+
+            try
+            {
+                // 初始化QQ邮箱专属MimeMessage（逻辑同通用MailKit，但需注意发件人必须与QQ账号一致）
+                _mailKitMessage.From.Add(new MailboxAddress(_senderAccount.FromMailDisplayName, _senderAccount.FromMailAddress));
+                _mailKitMessage.To.Add(new MailboxAddress(_mailMessageMain.ToMailDisplayName ?? _mailMessageMain.ToMail, _mailMessageMain.ToMail));
+                _mailKitMessage.Subject = _mailMessageMain.Subject;
+
+                // 正文（QQ邮箱支持HTML，无需特殊处理）
+                var bodyBuilder = new BodyBuilder();
+                bodyBuilder.HtmlBody = _mailMessageMain.EmailBody;
+                bodyBuilder.TextBody = GetHtmlText(_mailMessageMain.EmailBody ?? string.Empty);
+                _mailKitMessage.Body = bodyBuilder.ToMessageBody();
+
+                // 附件逻辑（复用通用AddMailKitAttachments）
+                if (_mailMessageMain.AttachedFiles != null)
+                {
+                    foreach (var file in _mailMessageMain.AttachedFiles)
+                    {
+                        if (File.Exists(file)) AddMailKitAttachments(file);
+                    }
+                }
+
+                using var mailKitClient = new MailKit.Net.Smtp.SmtpClient();
+                // QQ邮箱证书验证（保留通用逻辑）
+                mailKitClient.ServerCertificateValidationCallback = (sender, cert, chain, errors) =>
+                {
+                    // 生产环境建议严格验证，测试环境可简化
+                    if (errors == SslPolicyErrors.None) return true;
+
+                    _logger.LogError($"QQ郵箱證書驗證失敗：{errors}");
+                    Console.WriteLine($"QQ郵箱證書驗證失敗：{errors}");
+
+                    // 載入PFX格式的憑證（客戶端憑證）
+                    var certificate = LoadCertificate(_mailComId);
+
+                    if (certificate != null)
+                    {
+                        // 某些伺服器(指Brevo.com)可能需要客戶端 SSL 憑證才能允許使用者連線。 
+                        // 載入PFX格式的憑證。 
+                        // 而不是指目標收件人的服務器要求SSL證書。 
+                        if (mailKitClient.ClientCertificates != null)
+                        {
+                            mailKitClient.ClientCertificates.Add(certificate);
+                            string importantHints = $"🌄 [IMPORTANT] [MAIL TASK SERVICE] 🎡 [★★★★★][func::SendQQAsynchronous] Loaded client certificate for {_mailComId}: "
+                                                     + $"Subject={certificate.Subject}, Thumbprint={certificate.Thumbprint}, "
+                                                     + $"HasPrivateKey={certificate.HasPrivateKey}";
+                            _logger.LogInformation(importantHints);
+                        }
+                    }
+                    else
+                    {
+                        _logger.LogWarning($"[func::SendQQAsynchronous] No valid certificate found for {_mailComId}.");
+                    }
+
+                    return false;
+                };
+
+                // QQ邮箱SMTP连接（适配端口和加密方式）
+                var secureOptions = _senderAccount.EnableSSL
+                    ? SecureSocketOptions.SslOnConnect  // 465端口用SSL
+                    : SecureSocketOptions.StartTls;    // 587端口用STARTTLS
+                await mailKitClient.ConnectAsync(
+                    _senderAccount.SenderServerHost,
+                    _senderAccount.SenderServerHostPort,
+                    secureOptions
+                );
+
+                // QQ邮箱认证：必须使用“授权码”而非登录密码，需提示用户在QQ邮箱设置中开启
+                await mailKitClient.AuthenticateAsync(_senderAccount.SenderUserName, _senderAccount.SenderUserPassword);
+
+                // 发送邮件
+                await mailKitClient.SendAsync(_mailKitMessage);
+                await mailKitClient.DisconnectAsync(true);
+
+                sendSuccess = true;
+                string sendMailResponse = $"\n🌄 [SEND MAIL RESPONSE SUCCESS] 🎡 [func::EmailEnhanceHelper.SendQQAsynchronous] [qq email sent successfully] [{_senderAccount.SenderUserName}] 🌇\n";
+                _logger.LogInformation(sendMailResponse);
+                Console.WriteLine(sendMailResponse);
+            }
+            catch (AuthenticationException ex)
+            {
+                lastException = ex;
+                // QQ邮箱认证失败专属提示（授权码错误/未开启SMTP）
+                string sendMailResponse = $"\n 🌄🎡 [func::EmailEnhanceHelper.SendQQAsynchronous] 🌄 [Send Mail Response AuthenticationException] [{ex.Message}] 🌇\n"
+                                           + $"[qq email Authentication failed] Please Check Smtp：1.senderUserName and senderUserPassword 2. Is an authorization code being used instead of a login password?\r\n3. Are the username and password correct? [Check logs]";
+                _logger.LogError(ex, sendMailResponse);
+                await Console.Out.WriteLineAsync(sendMailResponse);
+            }
+            catch (SmtpCommandException ex)
+            {
+                lastException = ex;
+                _logger.LogError(ex, $"[QQ Mail SMTP command error] Error code：{ex.ErrorCode} {ex.Message}");
+            }
+            catch (Exception ex)
+            {
+                lastException = ex;
+                _logger.LogError(ex, "[func::SendQQAsynchronous] Send failed");
+            }
+            finally
+            {
+                sw.Stop();
+                // 日志记录（标准化）
+                var status = sendSuccess ? "SUCCESS" : "FAILED";
+                string sendMailFinallyMsg = $"\n 🌄🎡 [func::EmailEnhanceHelper.SendQQAsynchronous] [TO:{_mailMessageMain.ToMail}] [{status}] [Time Consuming:{sw.ElapsedMilliseconds}ms]🌇\n";
+                _logger.LogInformation(sendMailFinallyMsg);
+                await Console.Out.WriteLineAsync(sendMailFinallyMsg);
+                // 资源释放
+                _mailKitMessage.Dispose();
+            }
+
+            return sendSuccess;
+        }
+        /// <summary>
         /// 異步發送郵件 Sending emails asynchronously
         /// </summary>
         /// <returns></returns>
@@ -679,6 +828,9 @@ namespace MailEnhanceService
                 if (_senderAccount.MailTool == (int)MailToolEnum.MAIL_KIT_SMTP) // MailKit
                 {
                     sendSuccess = await SendMailKitAsynchronous();
+                }else if (_senderAccount.MailTool == (int)MailToolEnum.QQ_SMTP) // dukesend.com
+                {
+                    sendSuccess = await SendQQAsynchronous();
                 }
                 else // System.Net.Mail
                 {
@@ -853,6 +1005,81 @@ namespace MailEnhanceService
             return certificate;
         }
     }
-     
+
+    /// <summary>
+    /// 獲取 EMAIL SENDER ACCOUNT LIST 配置
+    /// </summary>
+    public static class EmailConfigHelper
+    {
+        /// <summary>
+        /// 獲取 EMAIL SERVER AUTHENTIC USER 配置，從 Config 文件夾下對應店鋪的 JSON 文件讀取
+        /// EmailWebAppService_{mainComId}.json
+        /// </summary>
+        /// <param name="mainComId"></param>
+        /// <returns></returns>
+        public static AuthenticUserModel LoadFromConfig(string mainComId)
+        {
+            if (string.IsNullOrEmpty(mainComId))
+            {
+                // 使用內置 項目 MailEnhanceService.csproj 發郵件 無需要
+                // 無須配置 第三方發郵件(EamilWebApp.csproj)
+                AuthenticUserModel authenticUserModel = new AuthenticUserModel
+                {
+                    MainComId = string.Empty,
+                    ShopId = string.Empty,
+                    UserName = string.Empty,
+                    AuthenticationCode = string.Empty,
+                    AuthenticMethods = string.Empty
+                };
+                return authenticUserModel;
+            }
+            else
+            {
+                string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Config", $"EmailWebAppService_{mainComId}.json");
+                string jsonData = File.ReadAllText(path);
+                return JsonConvert.DeserializeObject<AuthenticUserModel>(jsonData) ?? new AuthenticUserModel();
+            }
+
+
+        }
+
+        /// <summary>
+        /// 從本地文件夾 Config 下讀取 EMAIL 發件人帳號配置。
+        /// 若果 SenderEmailAccountList_{mainComId}.json 文件不存在，則返回 SenderEmailAccountList.Json 帳號列表。
+        /// </summary>
+        /// <param name="mainComId"></param>
+        /// <param name="senderListOfMainCom"></param>
+        /// <returns></returns>
+        public static bool ToEmailAccountsInstance(string mainComId, out IList<SenderEmailAccount> senderListOfMainCom)
+        {
+            senderListOfMainCom = new List<SenderEmailAccount>();
+
+            string configPath = Path.GetFullPath("./Config");
+            string configFileName = $"SenderEmailAccountList.Json";
+            if (!string.IsNullOrEmpty(mainComId))
+            {
+                configFileName = $"SenderEmailAccountList_{mainComId}.json";
+            }
+            string pathfileName = Path.Combine(configPath, configFileName);
+
+            if (!File.Exists(pathfileName))
+            {
+                // If the file does not exist, returns an empty list. 
+                return false;
+            }
+
+            string jsonOfMailSenderList = MailCommonBase.ReadConfigJson(pathfileName);
+            if (!string.IsNullOrEmpty(jsonOfMailSenderList))
+            {
+                senderListOfMainCom = JsonConvert.DeserializeObject<IList<SenderEmailAccount>>(jsonOfMailSenderList);
+
+                if (senderListOfMainCom != null && senderListOfMainCom.Count > 0)
+                {
+                    return true; // If the list is empty after deserialization, return false
+                }
+            }
+            return false;
+        }
+    }
 }
 

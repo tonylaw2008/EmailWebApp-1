@@ -1,5 +1,6 @@
 using EamilWebApp;
 using EamilWebApp.Models;
+using MailEnhanceService;
 using System.Configuration;
 
 var builder = WebApplication.CreateBuilder(args);

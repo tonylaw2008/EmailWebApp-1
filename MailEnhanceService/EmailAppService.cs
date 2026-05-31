@@ -38,24 +38,24 @@ namespace MailEnhanceService
         /// <param name="emailEnhance"></param>
         /// <param name="senderEmailAccountList"></param>
         /// <param name="logger"></param>
-        public EmailAppService(string mainComId, EmailEnhanceHelper emailEnhance, IList<SenderEmailAccount> senderEmailAccountList, ILogger<EmailAppService> logger)
+        public EmailAppService(AuthenticUserModel authModel, EmailEnhanceHelper emailEnhance, IList<SenderEmailAccount> senderEmailAccountList, ILogger<EmailAppService> logger)
         {
             _logger = logger; 
             emailEnhanceHelper = emailEnhance;
 
             //沒有指明 MainComId,則使用系統Aspsettings.json 中的配置
-            if (string.IsNullOrEmpty(mainComId))
+            if (string.IsNullOrEmpty(authModel.MainComId))
             {
-                _logger.LogInformation($"Because mainComId is an empty string, the email account list is retrieved from the local configuration. {nameof(mainComId)}");
+                _logger.LogInformation($"Because mainComId is an empty string, the email account list is retrieved from the local configuration. {nameof(authModel.MainComId)}");
                 SenderEmailAccountList = senderEmailAccountList;
             }
             else
             {
-                bool isFromMainComId = ToInstanceFromLocalConfigJson(mainComId,out IList<SenderEmailAccount> SenderList); 
+                bool isFromMainComId = ToInstanceFromLocalConfigJson(authModel.MainComId, out IList<SenderEmailAccount> SenderList); 
                 if (isFromMainComId)
                 {
                     SenderEmailAccountList = SenderList;
-                    _logger.LogInformation($"The Sender Email Account List Is From MainCom(Config Folder) {mainComId}");
+                    _logger.LogInformation($"The Sender Email Account List Is From MainCom(Config Folder) {authModel.MainComId}");
                 }
                 else
                 {
@@ -72,17 +72,16 @@ namespace MailEnhanceService
         /// 首先啟動服務後再調用發郵件函數
         /// </summary>
         /// <returns></returns> 
-        public static EmailAppService StartUpEmailAppService(string? mainComId)
+        public static EmailAppService StartUpEmailAppService(AuthenticUserModel authModel)
         {
-            if (string.IsNullOrEmpty(mainComId))
+            if (string.IsNullOrEmpty(authModel.MainComId))
             {
-                mainComId = string.Empty;
+                authModel.MainComId = string.Empty;
             }
 
             // 建立服務集合並配置服務
-            var services = new ServiceCollection();
-            ServiceConfigurator.ConfigureServices(services, mainComId);
-
+            var services = new ServiceCollection(); 
+            ServiceConfigurator.ConfigureServices(services, authModel);
             // 建構服務提供者
             var serviceProvider = services.BuildServiceProvider();
              
@@ -182,6 +181,107 @@ namespace MailEnhanceService
             #endregion END TASK RUN
         }
 
+        //==============================================================================================================================
+        /// <summary>
+        /// 傳入郵件列表，逐一發送郵件
+        /// 具體用法參考 Program.cs 或 MailJobService/Program.cs.md
+        /// </summary>
+        /// <param name="mailToList">email 字符串数组</param>
+        /// <param name="subjectIfHave">如果沒有主題，則會使用 內容的純文本前20字作為主題。</param>
+        /// <param name="mailTemplateEnum">不使用模板，必須 MailTemplateEnum.NO_TEMPLATE</param>
+        /// <param name="bodyRawContentIfHave">如果指定了郵件模版，則會使用指定的模板内容，而不會例會傳入參數 bodyRawContent 的內容</param>
+        /// <param name="languageCode">使用什麼語言版本的模板 en-US;zh-HK;zh-CN</param>
+        /// <param name="callBackUrlEncode">回調的URL</param>
+        /// <param name="attachedFilesIfHave">文件路徑的字符串數組</param>
+        /// <returns>帶返回結果列表</returns>
+        public async Task<List<SendingResult>> RunWithResultsAsync(string[] mailToList, string subjectIfHave, MailTemplateEnum mailTemplateEnum, string bodyRawContentIfHave, string languageCode, string callBackUrlEncode, string[]? attachedFilesIfHave=null)
+        {
+            #region BEGIN TASK RUN
+            //============================================================================================================================== 
+            // 初始化 返回每一個EMAIL的發送結果值 sendingResults
+            List<SendingResult> sendingResults = new List<SendingResult>();
+
+            foreach (var item in mailToList)
+            { 
+                await Console.Out.WriteLineAsync($"🌅 [2026-05-17 10:36:50 480]🌠 [EMAIL SENDING] [RunWithResultsAsync] [Recipient:{item}]");
+
+                Stopwatch sw = new Stopwatch();
+                sw.Start();
+                string waitToSend = item;
+
+                if (!MailCommonBase.IsValidEmail(waitToSend))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    string toMailAddress = waitToSend;
+
+                    if (mailTemplateEnum != MailTemplateEnum.NO_TEMPLATE)
+                    {
+                        bodyRawContentIfHave = GetMailTemplate(mailTemplateEnum, languageCode);
+                    }
+
+                    if (!string.IsNullOrEmpty(bodyRawContentIfHave))
+                    {
+                        bodyRawContentIfHave = bodyRawContentIfHave.Replace("{callbackurl}", callBackUrlEncode);
+                    }
+                    string subjectInfo = string.Empty;
+
+                    if (!string.IsNullOrEmpty(subjectIfHave))
+                    {
+                        subjectInfo = subjectIfHave;
+                    }
+                    else
+                    {
+                        //如果主題信息為空，則從正文內容中提取前50個字符作為主題
+                        string htmlContent = GetHtmlText(bodyRawContentIfHave);
+                        int cutLenght = htmlContent.Length > 50 ? 50 : htmlContent.Length;
+                        subjectInfo = htmlContent.Substring(0, cutLenght);
+                    }
+
+                    //發送郵件， 後續 可在這裡配合設置多個郵件發送賬號，啟動發送失敗輪詢發送郵件，
+                    foreach (var item1OfSenderAccount in SenderEmailAccountList)
+                    {
+                        bool succ = await emailEnhanceHelper.SendMailsync(item1OfSenderAccount, toMailAddress, subjectInfo, bodyRawContentIfHave, attachedFilesIfHave);
+                         
+                        SendingResult sendingResult = new SendingResult
+                        {
+                            RecipientEmail = toMailAddress,
+                            Result = succ
+                        };
+
+                        sendingResults.Add(sendingResult);
+                         
+                        if (succ)
+                        {
+                            _logger.LogInformation($"Sending Email the first time（{toMailAddress}） SUCC = {succ}......");
+                            break; // 如果發送成功，跳出循環
+                        }
+                        else
+                        {
+                            _logger.LogError($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] [sender:{item1OfSenderAccount.SenderUserName}] Failed to send email to {toMailAddress}. Trying next sender account...");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    const string logTemplate = "[Exeception] [{Message}]";
+                    _logger.LogError(logTemplate, ex.Message);
+                }
+                finally
+                {
+                    _logger.LogInformation($">>>Send Mail Elapsed Time = {sw.Elapsed.Seconds} Seconds");
+                    sw.Stop();
+                }
+            }
+
+            return sendingResults;
+
+            #endregion END TASK RUN
+        }
+
         /// <summary>
         /// MailTemplateEnum 常量类型 改用字符串类型 例如：模板 ForgetPassword_zh-HK.html  常量定义是：ForgetPassword
         /// 可提供外部調用，根據模板枚舉值和語言代碼獲取對應的郵件模板內容
@@ -244,7 +344,7 @@ namespace MailEnhanceService
             html = html.Replace("\r\n", "").Replace("\r", "").Replace("&nbsp;", "").Replace(" ", "");
             return html;
         }
-
+         
         /// <summary>
         /// 將枚舉值轉換為郵件模板文件名稱
         /// </summary>

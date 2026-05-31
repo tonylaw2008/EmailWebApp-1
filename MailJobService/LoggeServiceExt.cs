@@ -6,7 +6,7 @@ using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 
-namespace MailJobService
+namespace MailTaskJobService
 {
     public static class LoggerServiceExt
     {

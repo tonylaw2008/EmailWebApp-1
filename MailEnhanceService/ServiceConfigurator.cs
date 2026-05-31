@@ -34,27 +34,35 @@ namespace MailEnhanceService
                 .Build();
         }
 
-        public static IServiceCollection ConfigureServices(IServiceCollection services, string? mainComId)
+        public static IServiceCollection ConfigureServices(IServiceCollection services, AuthenticUserModel authModel)
         { 
             var configuration = ReadFromAppSettings();
 
-            var emailSettingOptions = new EmailSettingOptions();
-            configuration.GetSection("senderEmailAccountList").Bind(emailSettingOptions.SenderEmailAccountList);
-             
-            // 关键修复：同时注册具体类型和接口类型
-            var accountList = emailSettingOptions.SenderEmailAccountList;
+            // 注册 AuthenticUserModel 实例
+            services.AddSingleton(authModel);
+
+            // Email Sender Account List 配置綁定
+            //var emailSettingOptions = new EmailSettingOptions();
+            //configuration.GetSection("senderEmailAccountList").Bind(emailSettingOptions.SenderEmailAccountList);
+            //// 关键修复：同时注册具体类型和接口类型
+            //var accountList = emailSettingOptions.SenderEmailAccountList;
+            //services.AddSingleton(accountList); // 注册具体类型 List<SenderEmailAccount>
+            //services.AddSingleton<IList<SenderEmailAccount>>(accountList); // 注册接口类型
+
+            // 改為從EmailConfigHelper獲取郵件帳戶列表，並註冊到DI容器中
+            var ret = EmailConfigHelper.ToEmailAccountsInstance(authModel.MainComId, out IList<SenderEmailAccount> accountList);
             services.AddSingleton(accountList); // 注册具体类型 List<SenderEmailAccount>
             services.AddSingleton<IList<SenderEmailAccount>>(accountList); // 注册接口类型
 
-            // 配置内存缓存
-            services.AddMemoryCache();
+            // 配置内存缓存 (這個pagekage有問題，先忽略)
+            services.AddMemoryCache(); 
            
             // 配置 log4net
             services = ConfigureLog4Net(services);
 
             // 注册服务（使用瞬态生命周期）
-            mainComId = mainComId ?? string.Empty; 
-            services.AddSingleton(mainComId);
+            authModel.MainComId = authModel.MainComId ?? string.Empty; 
+            services.AddSingleton(authModel.MainComId);
             services.AddTransient<EmailAppService>();
 
             // 注入郵件發送單元
@@ -106,11 +114,11 @@ namespace MailEnhanceService
             return services;
         }
          
-        public static IServiceCollection AddMailEnhanceService(this IServiceCollection services,string? mainComId)
-        {
-            mainComId = mainComId ?? string.Empty;
-            return ConfigureServices(services, mainComId);
-        }
+        //public static IServiceCollection AddMailEnhanceService(this IServiceCollection services,string? mainComId)
+        //{
+        //    mainComId = mainComId ?? string.Empty;
+        //    return ConfigureServices(services, mainComId);
+        //}
 
         // 配置中間件 范例 （未使用2025-8-25）
         public static void  Configure(IApplicationBuilder app, IHostEnvironment hostEnvironment)

@@ -19,6 +19,7 @@ namespace EamilWebApp
     {
         SUCCESS = 1,
         FAIL = 0,
+        EXCEPTION = -1,
     }
 
     /// <summary>

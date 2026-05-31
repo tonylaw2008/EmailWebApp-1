@@ -136,9 +136,9 @@
             chkEnableTSL.AutoSize = true;
             chkEnableTSL.Location = new Point(187, 125);
             chkEnableTSL.Name = "chkEnableTSL";
-            chkEnableTSL.Size = new Size(104, 19);
+            chkEnableTSL.Size = new Size(151, 19);
             chkEnableTSL.TabIndex = 7;
-            chkEnableTSL.Text = "Check For TSL";
+            chkEnableTSL.Text = "Check For TSL(Priority)";
             chkEnableTSL.UseVisualStyleBackColor = true;
             chkEnableTSL.CheckedChanged += chkEnableTSL_CheckedChanged;
             // 

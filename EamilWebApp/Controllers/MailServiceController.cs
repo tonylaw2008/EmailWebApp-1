@@ -2,6 +2,8 @@
 using MailEnhanceService;
 using Microsoft.AspNetCore.Mvc;
 using System.Diagnostics;
+using System.Text;
+using System.Text.Unicode;
 
 namespace EamilWebApp.Controllers
 {
@@ -48,7 +50,7 @@ namespace EamilWebApp.Controllers
         [HttpPost("SendMail")]
         public async Task<IActionResult> SendMail([FromBody] SendingEmailModel emailModel)
         {
-            _logger.LogInformation("{mainComId} MailService/SendMail called at {Time}", emailModel?.MainComId, DateTime.Now);
+            _logger.LogInformation("{mainComId} MailService/SendMail called at {Time}", emailModel?.MainComId, DateTime.Now.ToLocalTime());
 
             // 初始化响应对象
             var response = new ResponseModalX
@@ -56,7 +58,7 @@ namespace EamilWebApp.Controllers
                 meta = new MetaModalX
                 {
                     Success = false,
-                    Message = "郵件發送失敗",
+                    Message = "Email failed to send",
                     ErrorCode = 1
                 },
                 data = new { }
@@ -67,13 +69,13 @@ namespace EamilWebApp.Controllers
                 // 1. 基础参数验证
                 if (emailModel == null)
                 {
-                    response.meta.Message = "請提供有效的郵件參數";
+                    response.meta.Message = "Please provide valid email parameters.";
                     return Ok(response);
                 }
 
                 if (string.IsNullOrEmpty(emailModel.MainComId))
                 {
-                    response.meta.Message = "缺少必要參數：mainComId";
+                    response.meta.Message = "Reuired Parameter：mainComId";
                     return Ok(response);
                 }
                 emailModel.MainComId = emailModel.MainComId.Trim();
@@ -81,13 +83,23 @@ namespace EamilWebApp.Controllers
                 if (string.IsNullOrEmpty(emailModel.LanguageCode))
                     emailModel.LanguageCode = "zh-HK";
 
+                if(!string.IsNullOrEmpty(emailModel.EmailContent))
+                {
+                    emailModel.EmailContent = Base64Helper.TryDecodeBase64(emailModel.EmailContent); 
+                }
+
+                if (!string.IsNullOrEmpty(emailModel.CallbackUrlEncode))
+                {
+                    emailModel.CallbackUrlEncode = Uri.UnescapeDataString(emailModel.CallbackUrlEncode);
+                }
+
                 // 2. 验证mainComId是否有效
                 _logger.LogInformation("_authenticUserModelList {Count}, mainComId = {mainComId}", _authenticUserModelList.Count(), emailModel.MainComId);
                 AuthenticUserModel authenticUserModel = _authenticUserModelList.FirstOrDefault(u => u.MainComId.Contains(emailModel.MainComId))??null;
 
                 if (authenticUserModel == null)
                 {
-                    response.meta.Message = "無效的 mainComId，未找到對應的認證用戶信息";
+                    response.meta.Message = "Invalid mainComId, no corresponding authenticated user information found.";
                     return Ok(response);
                 }
 
@@ -95,21 +107,21 @@ namespace EamilWebApp.Controllers
                 var authorizationHeader = HttpContext.Request.Headers["Authorization"].FirstOrDefault();
                 if (string.IsNullOrEmpty(authorizationHeader))
                 {
-                    response.meta.Message = "請在Header中提供Authorization: Bearer {token}";
+                    response.meta.Message = "Please provide Authorization in the Header: Bearer {token}";
                     return Ok(response);
                 }
 
                 // 验证Bearer Token格式
                 if (!authorizationHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
                 {
-                    response.meta.Message = "Authorization格式錯誤，請使用 Bearer {token}";
+                    response.meta.Message = "The authorization format is incorrect. Please use Bearer {token}.";
                     return Ok(response);
                 }
 
                 var token = authorizationHeader.Substring("Bearer ".Length).Trim();
                 if (token != authenticUserModel.AuthenticationCode)
                 {
-                    response.meta.Message = $"無效的Token：{token}";
+                    response.meta.Message = $"Invalid Token：{token}";
                     return Ok(response);
                 }
 
@@ -119,22 +131,21 @@ namespace EamilWebApp.Controllers
                 {
                     if (!Enum.TryParse<MailTemplateEnum>(emailModel.MailTemplateEnum, out mailTemplate))
                     {
-                        response.meta.Message = $"無效的郵件模板類型：{emailModel.MailTemplateEnum},或傳入 NO_TEMPLATE ";
+                        response.meta.Message = $"Invalid email template type：{emailModel.MailTemplateEnum},Or transmitted NO_TEMPLATE ";
                         return Ok(response);
                     }
                 }
 
                 // 5. 解析收件人列表
-                string[] mailToList;
-                if (string.IsNullOrEmpty(emailModel.Mailto))
-                    mailToList = new[] { _mailToDefault }; // 默认测试邮箱
-                else if (emailModel.Mailto.Contains(','))
-                    mailToList = emailModel.Mailto.Split(',').Select(m => m.Trim()).ToArray();
-                else
-                    mailToList = new[] { emailModel.Mailto.Trim() };
+                //string[] mailToList;
+
+                var mailToList = emailModel.Mailto.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                             .Select(s => s.Trim())
+                             .ToArray();
+                 
 
                 // 6. 初始化邮件服务并发送
-                var emailAppService = EmailAppService.StartUpEmailAppService(emailModel.MainComId);
+                var emailAppService = EmailAppService.StartUpEmailAppService(authenticUserModel);
                 emailAppService._logger.LogInformation("EmailAppService started for MailService/SendMail.");
 
                 bool success = await emailAppService.RunAsync(
@@ -151,18 +162,23 @@ namespace EamilWebApp.Controllers
                 if (success)
                 {
                     response.meta.Success = true;
-                    response.meta.Message = "郵件已成功發送";
+                    response.meta.Message = "The email has been sent successfully.";
                     response.meta.ErrorCode = 0;
+
+                    // 備份 郵件內容 html 格式
+                    string emailContentfileName = $"{DateTime.Now:yyy-MM-dd HH-mm}.html";
+                    string pathFileName = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"EmailLog",emailModel.MainComId, emailContentfileName);
+                    System.IO.File.WriteAllText(pathFileName, emailModel.EmailContent, Encoding.UTF8);
                 }
                 else
                 {
-                    response.meta.Message = "郵件發送失敗，請檢查日誌";
+                    response.meta.Message = "Email failed to send, please check the log.";
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "MailService/SendMail 發送郵件時發生異常");
-                response.meta.Message = $"內部錯誤：{ex.Message}";
+                _logger.LogError(ex, "MailService/SendMail An error occurred while sending email.");
+                response.meta.Message = $"Internal error：{ex.Message}";
                 response.meta.ErrorCode = 500;
             }
 

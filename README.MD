@@ -3,15 +3,69 @@
  https://github.com/tonylaw2008/EmailWebApp.git  
  git ssh 保存在 Your identification has been saved in C:\Users\Administrator/.ssh/id_ed25519
 
-## 💖💖如何使用： [如何使用發郵件接口服務.MD](如何使用發郵件接口服務.MD) 
+## 💖💖如何使用： [如何使用發郵件接口服務.MD](如何使用發郵件接口服務.MD)
+
+
+
+# 💖SMTP 服務
+
+1️⃣Brevo.com SMTP 服務
 
 🟫測試要注意：
 
+> Brevo 控制台获取的 SMTP KEY 密钥，不是登录密码 xsmtpsib-dfacfc38a44。。。14a3a7c3-xnGQXTuF1vLNOuxX
+>
+> 免費限制多，無法用，付費太貴。
+
+
+
+2️⃣Dukesend.com SMTP 服務
+
+> https://dukesend.com/#pricing
+>
+> 賬號： caixxxx2@gmail.com（GOOGLE GMAIL as LOGIN ACCOUNT）
+>
+> DUKESEND_KEY： SAVE TO @NOTION
+
 ```
-// 从 Brevo 控制台获取的 SMTP KEY 密钥，不是登录密码 xsmtpsib-dfacfc38a44。。。14a3a7c3-xnGQXTuF1vLNOuxX
+/// <summary>
+/// 選擇不同的SMTP發送平台
+/// 邏輯上都是基於SMTP協議的發送方式，
+/// 但是考慮到不同平台接口的區別，分別獨立的4個函數，以靈活應對不同情況。
+/// 其他可以使用 MAIL_KIT_SMTP = 1, 足以滿足一切標準SMTP
+/// </summary>
+public enum MailToolEnum
+{
+    SYSTEM_NET_MAIL_SMTP = 0,
+    MAIL_KIT_SMTP = 1,
+    QQ_SMTP = 2, 
+    OUTLOOK_SMTP = 3
+}
 ```
 
-Version: 1.0.0
+2️⃣.NET SMTP 組件服務
+
+> 這個組件對TSL證書不太兼容。
+
+
+
+4️⃣QQ SMTP配置指南
+
+> https://help.mail.qq.com/detail/108/1010
+>
+> 不能同時多個發件人數組 以FOR EACH 發送。 否則導致 Recipient 顯示多個收件人。如圖：
+>
+> ![image-20260522200103396](./README_IMGs/README/image-20260522200103396.png)
+
+
+
+5️⃣SMTP 99.999%都要求證書，必須的！！！
+
+> ##### mailKitClient.ClientCertificates.Add(certificate);
+>
+> 必須加載的證書。
+
+
 
 ## 🟫功能
 
@@ -64,11 +118,18 @@ EamilWebApp.csproj :
 
 如果主題信息為空，則從正文內容中提取前50個字符作為主題。
 
-
+> #### 對外部署要注意：
+>
+> ![image-20260521172847933](./README_IMGs/README/image-20260521172847933.png)
+>
 
 ## 🟦標準配置说明
 
  AppSetting.json 的 senderEmailAccountList 節點的配置, EMAIL發送賬戶列表。默認第1個發送失敗，則用第2個，如此類推。
+
+> #### 指定 傳入`mainComId`（為空）的時候，配置會從AppSetting.json 獲取，否則是從
+>
+> #### ./Config/SenderEmailAccountList_6000014.json
 
 ```
 //AppSetting.json OR SenderEmailAccountList_6000014.json
@@ -265,7 +326,7 @@ https://dnsnext.console.alibabacloud.com/authoritative/domains/xguard.hk
 
 ![image-20250822222537159](./README_IMGs/README/image-20250822222537159.png)
 
-## 2. Sender : service1@xguard.hk
+## 2. Sender : service1@xdsvvvdfd.hk
 
 Sender 發件人可以自定義，免費模式也有幾十個賬號可以自定義。
 
@@ -297,7 +358,7 @@ SMTP KEY XGUARD.HK ： **xsmtpsib-dfacfc38a4.....************....1vLNOuxX**
 
 ![image-20260509185031429](./README_IMGs/README/image-20260509185031429.png)
 
-
+![image-20260511045607452](./README_IMGs/README/image-20260511045607452.png)
 
 ## 5. Authoritied IP （不啟動）
 

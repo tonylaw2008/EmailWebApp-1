@@ -78,6 +78,17 @@ namespace MailEnhanceService
             return myhmacsha1.ComputeHash(stream).Aggregate("", (s, e) => s + String.Format("{0:x2}", e), s => s);
         }
 
+        /// <summary>
+        /// 获取html中纯文本 ref  https://blog.csdn.net/fuzhixin0/article/details/52129253
+        /// </summary>
+        /// <param name="html">html</param>
+        /// <returns>纯文本</returns>
+        public static string GetHtmlText(string html)
+        {
+            html = System.Text.RegularExpressions.Regex.Replace(html, @"<\/*[^<>]*>", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            html = html.Replace("\r\n", "").Replace("\r", "").Replace("&nbsp;", "").Replace(" ", "");
+            return html;
+        }
 
         /// <summary>
         /// md5加密
@@ -97,54 +108,8 @@ namespace MailEnhanceService
             }
             return re_str; 
         }
-        public static string DoPost(string url, string data)
-        {
-            HttpWebRequest req = GetWebRequest(url, "POST");
-            byte[] postData = Encoding.UTF8.GetBytes(data);
-            Stream reqStream = req.GetRequestStream();
-            reqStream.Write(postData, 0, postData.Length); reqStream.Close();
-            HttpWebResponse rsp = (HttpWebResponse)req.GetResponse();
-            Encoding encoding = Encoding.GetEncoding(rsp.CharacterSet);
-            return GetResponseAsString(rsp, encoding);
-        }
-        public static HttpWebRequest GetWebRequest(string url, string method)
-        {
-            HttpWebRequest req = (HttpWebRequest)WebRequest.Create(url);
-            req.ServicePoint.Expect100Continue = false;
-            req.ContentType = "application/x-www-form-urlencoded;charset=utf-8";
-            req.ContentType = "text/json";
-            req.Method = method;
-            req.KeepAlive = true;
-            req.Timeout = 1000000;
-            req.Proxy = null;
-            return req;
-        }
-        public static string GetResponseAsString(HttpWebResponse rsp, Encoding encoding)
-        {
-            StringBuilder result = new StringBuilder();
-            Stream stream = null;
-            StreamReader reader = null;
-            try
-            {
-                // 以字符流的方式读取HTTP响应
-                stream = rsp.GetResponseStream();
-                reader = new StreamReader(stream, encoding);
-                // 每次读取不大于256个字符，并写入字符串
-                char[] buffer = new char[256];
-                int readBytes = 0;
-                while ((readBytes = reader.Read(buffer, 0, buffer.Length)) > 0)
-                {
-                    result.Append(buffer, 0, readBytes);
-                }
-            }
-            finally
-            {
-                if (reader != null) reader.Close();
-                if (stream != null) stream.Close();
-                if (rsp != null) rsp.Close();
-            }
-            return result.ToString();
-        }
+       
+         
         public static DateTime ConvertIntDateTime(long unixDateTime)
         {
 
@@ -258,6 +223,7 @@ namespace MailEnhanceService
             dt = DateTime.Now.AddMinutes(mod);
             return dt;
         }
+        
         /// <summary>
         /// 模分钟数区时间
         /// </summary>

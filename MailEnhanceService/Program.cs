@@ -53,7 +53,10 @@ Console.WriteLine("\nIf you use the [Release] mode to test, please note: you nee
 
 //方式 II
 string? mainComId = string.Empty; // 非多公司平台，則可以不指定 mainComId
-EmailAppService emailAppService = EmailAppService.StartUpEmailAppService(mainComId);
+ 
+AuthenticUserModel authenticUser = new AuthenticUserModel{ MainComId = "6000014", ShopId="",AuthenticationCode="" };
+
+EmailAppService emailAppService = EmailAppService.StartUpEmailAppService(authenticUser);
 emailAppService._logger.LogInformation("EmailAppService has been started successfully.");
   
 bool success = false;

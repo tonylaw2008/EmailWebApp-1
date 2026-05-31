@@ -27,12 +27,12 @@
                         </div>
 
                         <!-- 收件人 -->
+                        
                         <div class="mb-3">
                             <label for="mailto" class="form-label">收件人</label>
-                            <input type="email" title="多個email，則使用','隔開。" class="form-control" id="mailto" name="mailto" required
-                                   placeholder="recipient@example.com">
+                            <input type="email" class="form-control" id="mailto" name="mailto" required multiple
+                                   placeholder="recipient1@example.com, recipient2@example.com (Please separate multiple email addresses with English commas)">
                         </div>
-
                         <!-- 主旨 -->
                         <div class="mb-3">
                             <label for="subject" class="form-label">主旨</label>
@@ -52,7 +52,7 @@
                         </div>
                         <!--callbackUrlEncode 回傳的URL-->
                         <div class="mb-3">
-                            <label for="callbackUrlEncode" class="form-label">回傳的URL</label>
+                            <label for="callbackUrlEncode" class="form-label" title="輸入的CallBackUrl會替換掉內容中的{callbackurl}">回傳的URL (規則：href="{callbackurl}")</label>
                             <input type="text" class="form-control" id="callbackUrlEncode" name="callbackUrlEncode" required
                                    placeholder="http://www.abc123.com/123456">
                         </div>
@@ -60,11 +60,32 @@
                         <!-- 隱藏欄位用於儲存 HTML 內容 -->
                         <input type="hidden" id="bodyHtml" name="bodyHtml" />
 
-                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <div class="d-grid gap-1 d-md-flex justify-content-md-end text-nowrap">
+                            
+                            <div class="mb-3 d-flex align-items-center gap-1">
+                                <input type="file" id="templateFile" accept=".html,.htm,.txt" class="form-control-sm" style="max-width:160px;overflow-x:hidden;" />
+                                <button type="button" id="uploadTemplateBtn" class="btn btn-outline-secondary btn-sm">
+                                    <i class="fas fa-upload"></i> 上傳模板
+                                </button>
+                                <span id="templateUploadStatus" class="small text-muted" style="max-width:160px;overflow-x:hidden;"></span>
+                                
+                                <select id="emailTemplateList1" name="emailTemplateList1" class="form-control-sm" style="max-width:250px;overflow-x:hidden;">
+                                    <option value="">-- 選擇模板 --</option>
+                                </select>
+                                <button type="button" id="DelTemplateBtn" class="btn btn-outline-secondary btn-sm">
+                                    <i class="fas fa-crash"></i> 刪除模板
+                                </button>
+                            </div>
+
+                        </div>
+
+                        <div class="d-grid gap-1 d-md-flex justify-content-md-end text-nowrap">
+                             
                             <button type="submit" class="btn btn-primary btn-lg">
                                 <i class="fas fa-paper-plane"></i> 發送郵件
                             </button>
                         </div>
+
                     </form>
 
                     <div id="resultMessage" class="mt-3"></div>
@@ -96,6 +117,234 @@
 
         let lakeEditor = null;
 
+        function showResult(message, type) {
+            const resultDiv = document.getElementById('resultMessage');
+            const alertClass = `alert alert-${type === 'danger' ? 'danger' : (type === 'success' ? 'success' : 'warning')}`;
+            resultDiv.innerHTML = `<div class="${alertClass} alert-dismissible fade show" role="alert">
+                                        ${message}
+                                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                    </div>`;
+            // 10秒后自动清除消息
+            setTimeout(() => resultDiv.innerHTML = '', 10000);
+        }
+
+        // 加载模板列表函数
+        async function loadTemplateList() {
+            const mainComId = document.getElementById('mainComId').value;
+            const token = document.getElementById('authenticationCode').value;
+            if (!mainComId) return;
+
+            try {
+                const response = await fetch(`/Home/GetTemplateList?mainComId=${encodeURIComponent(mainComId)}&token=${encodeURIComponent(token)}`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                const result = await response.json();
+                if (result.code === 0 && result.data) {
+                    const select = document.getElementById('emailTemplateList1');
+                    // 清空除第一个提示选项外的所有选项
+                    select.innerHTML = '<option value="">-- 選擇模板 --</option>';
+
+                    // 按类型分组显示（可选）
+                    const publicTemplates = result.data.filter(t => t.type === 'public');
+                    const companyTemplates = result.data.filter(t => t.type === 'company');
+
+                    if (publicTemplates.length > 0) {
+                        const groupPublic = document.createElement('optgroup');
+                        groupPublic.label = '📁 公共模板';
+                        publicTemplates.forEach(t => {
+                            const option = document.createElement('option');
+                            option.value = t.value;
+                            option.textContent = t.label;
+                            groupPublic.appendChild(option);
+                        });
+                        select.appendChild(groupPublic);
+                    }
+
+                    if (companyTemplates.length > 0) {
+                        const groupCompany = document.createElement('optgroup');
+                        groupCompany.label = '🏢 我的模板';
+                        companyTemplates.forEach(t => {
+                            const option = document.createElement('option');
+                            option.value = t.value;
+                            option.textContent = t.label;
+                            groupCompany.appendChild(option);
+                        });
+                        select.appendChild(groupCompany);
+                    }
+
+                    if (publicTemplates.length === 0 && companyTemplates.length === 0) {
+                        const option = document.createElement('option');
+                        option.disabled = true;
+                        option.textContent = '暫無模板，請上傳';
+                        select.appendChild(option);
+                    }
+                }
+            } catch (error) {
+                console.error('加載模板列表失敗：', error);
+            }
+        }
+
+        // 监听模板下拉选择变化
+        document.getElementById('emailTemplateList1').addEventListener('change', async function(e) {
+            const selectedUrl = this.value;
+            if (!selectedUrl) return;
+
+            // 显示加载状态
+            const originalText = this.options[this.selectedIndex]?.textContent || '';
+            showResult(`正在加載模板「${originalText}」...`, 'info');
+
+            try {
+                // 注意：这里的 selectedUrl 是我们在后端构造的 API URL，格式如 /api/template/content?path=...
+                // 需要确保发送正确的认证头
+                const token = document.getElementById('authenticationCode').value;
+                const response = await fetch(selectedUrl, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                const result = await response.json();
+                if (result.code === 0 && result.content) {
+                    lakeEditor.setValue(result.content);
+                    showResult(`✅ 已加載模板「${originalText}」`, 'success');
+                } else {
+                    showResult(`❌ 加載模板失敗：${result.msg || '未知錯誤'}`, 'danger');
+                }
+            } catch (error) {
+                console.error('加載模板內容失敗：', error);
+                showResult('❌ 網絡錯誤，無法加載模板', 'danger');
+            }
+            // 重置下拉选择（可选）
+            // this.value = '';
+        });
+
+        // 页面加载完成后调用加载模板列表
+        loadTemplateList();
+
+
+        // 上存並載入模版
+        // 模板上传功能
+        const templateFileInput = document.getElementById('templateFile');
+        const uploadTemplateBtn = document.getElementById('uploadTemplateBtn');
+        const templateStatusSpan = document.getElementById('templateUploadStatus');
+
+        uploadTemplateBtn.addEventListener('click', async function() {
+            const file = templateFileInput.files[0];
+            if (!file) {
+                showResult('請先選擇要上傳的模板文件（.html 或 .htm）', 'warning');
+                return;
+            }
+
+            // 检查文件类型
+            const allowedTypes = ['.html', '.htm', '.txt'];
+            const fileExt = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+            if (!allowedTypes.includes(fileExt)) {
+                showResult('不支持的文件類型，請上傳 .html, .htm 或 .txt 文件', 'danger');
+                return;
+            }
+
+            // 检查文件大小（5MB）
+            if (file.size > 5 * 1024 * 1024) {
+                showResult('文件大小超過 5MB 限制', 'danger');
+                return;
+            }
+
+            // 获取认证信息
+            const mainComId = document.getElementById('mainComId').value;
+            const authenticationCode = document.getElementById('authenticationCode').value;
+
+            if (!mainComId) {
+                showResult('缺少 MainComId，請檢查頁面配置', 'danger');
+                return;
+            }
+
+            // 显示上传状态
+            const originalBtnHtml = uploadTemplateBtn.innerHTML;
+            uploadTemplateBtn.disabled = true;
+            uploadTemplateBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 上傳中...';
+            templateStatusSpan.textContent = '上傳中...';
+            templateStatusSpan.classList.add('text-info');
+
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('mainComId', mainComId);
+                formData.append('token', authenticationCode);
+
+                const response = await fetch(`/Home/UploadTemplate?mainComId=${encodeURIComponent(mainComId)}&token=${encodeURIComponent(authenticationCode)}`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${authenticationCode}`
+                    },
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.code === 0) {
+                    // 上传成功，将模板内容加载到编辑器中
+                    if (lakeEditor && result.content) {
+                        lakeEditor.setValue(result.content);
+                        showResult(`✅ ${result.msg}，已加載模板：${result.fileName}`, 'success');
+                        templateStatusSpan.innerHTML = `<i class="fas fa-check-circle text-success"></i> 已加載：${result.fileName}`;
+                        templateStatusSpan.classList.remove('text-info');
+                        templateStatusSpan.classList.add('text-success');
+
+                        // 清空文件选择框，便于下次上传
+                        templateFileInput.value = '';
+
+                        // 5秒后清除状态提示
+                        setTimeout(() => {
+                            if (templateStatusSpan.innerHTML.includes('已加載')) {
+                                templateStatusSpan.innerHTML = '';
+                                templateStatusSpan.classList.remove('text-success');
+                            }
+                        }, 5000);
+
+
+                        // 刷新模板列表
+                        await loadTemplateList();
+                        // 可选：自动选中刚上传的模板
+                        const select = document.getElementById('emailTemplateList1');
+                        for (let i = 0; i < select.options.length; i++) {
+                            if (select.options[i].textContent === result.fileName) {
+                                select.value = select.options[i].value;
+                                // 触发 change 事件自动加载
+                                select.dispatchEvent(new Event('change'));
+                                break;
+                            }
+                        }
+
+                    } else {
+                        showResult(`⚠️ 模板已保存但無法加載到編輯器：${result.msg}`, 'warning');
+                    }
+                } else {
+                    const errorMsg = result.msg || '上傳失敗，請檢查權限或文件格式';
+                    showResult(`❌ 模板上傳失敗：${errorMsg}`, 'danger');
+                    templateStatusSpan.textContent = '上傳失敗';
+                    templateStatusSpan.classList.add('text-danger');
+                }
+            } catch (error) {
+                console.error('模板上傳錯誤：', error);
+                showResult('❌ 網絡錯誤，請稍後重試', 'danger');
+                templateStatusSpan.textContent = '上傳失敗，請重試';
+                templateStatusSpan.classList.add('text-danger');
+            } finally {
+                uploadTemplateBtn.disabled = false;
+                uploadTemplateBtn.innerHTML = originalBtnHtml;
+                // 3秒后清除错误状态文本（但不覆盖成功后的文件名显示）
+                setTimeout(() => {
+                    if (templateStatusSpan.textContent === '上傳失敗，請重試' || templateStatusSpan.textContent === '上傳失敗') {
+                        templateStatusSpan.textContent = '';
+                        templateStatusSpan.classList.remove('text-danger');
+                    }
+                }, 3000);
+            } 
+
+        });
+
+
         document.addEventListener('DOMContentLoaded', function () {
              
             const { Editor, Toolbar } = Lake;
@@ -108,7 +357,7 @@
                 'fontColor', 'highlight', '|', 'list', 'numberedList', 'bulletedList',
                 'checklist', 'table', '-', 'align', 'alignLeft', 'alignCenter', 'alignRight',
                 'alignJustify', '|', 'indent', 'increaseIndent', 'decreaseIndent', '|',
-                'link', 'image', 'codeBlock', 'equation', 'video',
+                'link', 'image', 'media', 'file', 'codeBlock', 'equation', 'video',
                 'twitter', 'blockQuote', 'paragraph', 'hr', '|', 'selectAll'
             ];
 
@@ -134,14 +383,31 @@
                     requestAction: uploadImgUrl,
                     requestTypes: ['image/gif', 'image/jpeg', 'image/png'],
                 },
+                media: {
+                  requestMethod: 'POST',
+                  requestAction: uploadMediaUrl,
+                  requestTypes: ['video/mp4', 'video/mpeg', 'video/webm'],
+                },
+                file: {
+                   requestMethod: 'POST',
+                   requestAction: uploadFileUrl,
+                   requestTypes: ['application/zip', 'application/pdf'],
+                 },
                 value: '<p>在這裡輸入郵件內容...</p>',
             });
 
             lakeEditor.render();
             const contentDiv = document.querySelector('.my-content');
             if (contentDiv) contentDiv.style.minHeight = '300px';
-        });
+             
+            lakeEditor.event.on('change', value => {
+                var lakeEditorContent = lakeEditor.getHTML();
+                $("#bodyHtml").val(lakeEditorContent);
+                    console.log('Editor content changed:', lakeEditorContent);
+            });
 
+
+             
         // 获取提交按钮元素
         const submitBtn = document.querySelector('#mailForm button[type="submit"]');
         let originalBtnHtml = submitBtn ? submitBtn.innerHTML : '';
@@ -150,8 +416,8 @@
         document.getElementById('mailForm').addEventListener('submit', async function (e) {
             e.preventDefault();
              
-            // 1. 同步编辑器内容到隐藏字段
-            const emailBody = lakeEditor.getValue();
+            // 1. 同步编辑器内容到隐藏字段 - 确保在提交前获取最新的 HTML 内容
+            const emailBody = lakeEditor.getHTML();
             document.getElementById('bodyHtml').value = emailBody;
 
             // 2. 收集表单数据
@@ -210,9 +476,9 @@
                     // 清空表单（注意收件人元素 id 是 mailto，不是 toEmail）
                     document.getElementById('mailto').value = '';
                     document.getElementById('subject').value = '';
-                    document.getElementById('callbackUrlEncode').value = '';
-                    document.getElementById('mainComId').value = '';
-                    lakeEditor.setValue('<p>在這裡輸入郵件內容...</p>');
+                    document.getElementById('callbackUrlEncode').value = ''; 
+                    // 不重置內容
+                    //lakeEditor.setValue('<p>在這裡輸入郵件內容...</p>'); 
                 } else {
                     const errorMsg = result.meta?.message || '發送失敗';
                     showResult('❌ ' + errorMsg, 'danger');
@@ -228,19 +494,9 @@
                 }
             }
         });
+         
 
-        function showResult(message, type) {
-            const resultDiv = document.getElementById('resultMessage');
-            const alertClass = `alert alert-${type === 'danger' ? 'danger' : (type === 'success' ? 'success' : 'warning')}`;
-            resultDiv.innerHTML = `<div class="${alertClass} alert-dismissible fade show" role="alert">
-                                        ${message}
-                                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                                    </div>`;
-            // 10秒后自动清除消息
-            setTimeout(() => resultDiv.innerHTML = '', 10000);
-        }
-
-        // 通用上传函数(not work)
+        // 通用上传函数(not work) 沒有使用
         async function upload(file, url, insertFn) { 
             const authHeader = `Bearer ${document.getElementById('authenticationCode').value}`;
             const formData = new FormData();
@@ -263,5 +519,8 @@
                 console.error('Upload error:', error);
             }
         } 
+
+         
+    });
     </script>
 }

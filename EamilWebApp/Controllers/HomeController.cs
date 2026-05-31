@@ -5,7 +5,8 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
-using System.Diagnostics; 
+using System.Diagnostics;
+using System.Text;
 
 namespace EamilWebApp.Controllers
 {
@@ -31,7 +32,7 @@ namespace EamilWebApp.Controllers
             _webHostEnvironment = webHostEnvironment;
             _authenticUserModelList = authenticUserModelList;
             _mailToDefault = mailToDefault;
-            HttpRequest httpRequest = context.HttpContext?.Request;
+            HttpRequest? httpRequest = context.HttpContext?.Request;
 
             _httpHost = string.IsNullOrEmpty(httpRequest?.Host.Port.ToString())
                            ? $"{httpRequest?.Scheme}://{httpRequest?.Host.Host}"
@@ -43,7 +44,8 @@ namespace EamilWebApp.Controllers
 
         public IActionResult Index()
         {
-            _logger.LogInformation("Index action called at {Time}", DateTime.UtcNow);
+
+            _logger.LogInformation("Index action called at {Time}", DateTime.UtcNow.ToLocalTime());
 
             return View(_authenticUserModelList);
         }
@@ -56,25 +58,69 @@ namespace EamilWebApp.Controllers
             ViewBag.MainComId = mainComId;  // 視圖前端使用
             return View();
         }
-         
+
 
         /// <summary>
         /// Email編輯器的頁面。
         /// </summary>
         /// <returns></returns>
+        [HttpGet]
         public IActionResult EmailEditor(string mainComId, string token)
         {
-            _logger.LogInformation("EmailEditor action called at {Time}", DateTime.UtcNow);
+            // 准备响应对象
+            var response = new ResponseModalX
+            {
+                meta = new MetaModalX
+                {
+                    Success = false,
+                    Message = "Invalid user authentication failed!",
+                    ErrorCode = 1
+                },
+                data = new { }
+            };
+
+            _logger.LogInformation("EmailEditor action http get at {Time}", DateTime.UtcNow.ToLocalTime());
 
             if (string.IsNullOrEmpty(mainComId))
             {
                 return BadRequest(new { code = 1, msg = "no parameter input : mainComId" });
             }
+             
+            try
+            { 
+                // 參數 token 
+                if (string.IsNullOrEmpty(token))
+                {
+                    response.meta.Message = "Token is empty after Bearer prefix.";
+                    return View(response);
+                }
+                 
+                // 3. 拼接完整的认证头（Bearer + token），匹配 IsValidAuth 方法的校验逻辑
+                string authHeader = $"Bearer {token.Trim()}";
+                // 4. 调用认证方法（传入完整的 authHeader）
+                // 验证 token
+                if (!_pubBusiness.IsValidAuth(mainComId, authHeader))
+                {
+                    response.meta.Message = $"Invalid token: {token}";
+                    return View("ResponseModal", response);
+                }
+            }
+            catch (Exception ex)
+            {
+                response.meta = new MetaModalX
+                {
+                    ErrorCode = (int)GeneralResult.EXCEPTION,
+                    Success = false,
+                    Message = $"Authentication exception: {ex.Message}"
+                };
+                return View(response);
+            }
+
 
             ViewBag.MainComId = mainComId;  // 視圖前端使用
             ViewBag.AuthenticationCode = token;  // 視圖前端使用
 
-            return View();
+            return View(response);
         }
 
         [HttpPost]
@@ -100,7 +146,7 @@ namespace EamilWebApp.Controllers
                     Message = "郵件發送失敗",
                     ErrorCode = 1
                 },
-                data = null
+                data = new { }
             };
 
             try
@@ -130,7 +176,7 @@ namespace EamilWebApp.Controllers
                     return Ok(response);
                 }
 
-                var emailAppService = EmailAppService.StartUpEmailAppService(emailModel.MainComId);
+                var emailAppService = EmailAppService.StartUpEmailAppService(authenticUserModel);
                 emailAppService._logger.LogInformation("EmailAppService started.");
 
                 // 解析收件人列表
@@ -342,11 +388,11 @@ namespace EamilWebApp.Controllers
             // 2. 允許的檔案副檔名（可依需求調整）
             var allowedExtensions = new[]
             {
-             ".pdf", ".zip", ".rar", ".7z", // 壓縮包
-             ".doc", ".docx", ".xls", ".xlsx", // office 文檔
-             ".ppt", ".pptx", ".txt", ".csv", // office 及文字
-             ".jpg", ".jpeg", ".png", ".gif", ".bmp" // 圖片（其實已有 UploadImg，但有需要也可支援）
-             // 可繼續新增其他類型
+                 ".pdf", ".zip", ".rar", ".7z", // 壓縮包
+                 ".doc", ".docx", ".xls", ".xlsx", // office 文檔
+                 ".ppt", ".pptx", ".txt", ".csv", // office 及文字
+                 ".jpg", ".jpeg", ".png", ".gif", ".bmp" // 圖片（其實已有 UploadImg，但有需要也可支援）
+                 // 可繼續新增其他類型
              };
 
             var fileExtension = Path.GetExtension(file.FileName).ToLowerInvariant();
@@ -396,6 +442,189 @@ namespace EamilWebApp.Controllers
         public IActionResult Error()
         {
             return View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
+        }
+
+
+        /// <summary>
+        /// 上传邮件模板（HTML文件）到 MailTemplate/{MainComId}/ 目录
+        /// </summary>
+        [HttpPost]
+        public async Task<IActionResult> UploadTemplate(string mainComId, string token, IFormFile file)
+        {
+            // 1. 参数验证
+            if (string.IsNullOrEmpty(mainComId))
+            {
+                return BadRequest(new { code = 1, msg = "The necessary parameters are missing：mainComId" });
+            }
+
+            if (file == null || file.Length == 0)
+            {
+                return BadRequest(new { code = 1, msg = "Please select the template file to upload" });
+            }
+
+            // 2. 文件类型限制（仅允许HTML及相关文本格式）
+            var allowedExtensions = new[] { ".html", ".htm", ".txt", ".cshtml" };
+            var fileExtension = Path.GetExtension(file.FileName).ToLowerInvariant();
+            if (!allowedExtensions.Contains(fileExtension))
+            {
+                return BadRequest(new { code = 1, msg = "For unsupported file types, please upload a .html, .htm, or .txt file" });
+            }
+
+            // 3. 文件大小限制（5MB）
+            const long maxFileSize = 5 * 1024 * 1024;
+            if (file.Length > maxFileSize)
+            {
+                return BadRequest(new { code = 1, msg = $"The file size exceeds the limit（最大 {maxFileSize / 1024 / 1024} MB）" });
+            }
+
+            // 4. 认证验证（与现有上传方法保持一致）
+            if (string.IsNullOrEmpty(token) || !_pubBusiness.IsValidAuth(mainComId, $"Bearer {token}"))
+            {
+                var authHeader = Request.Headers["Authorization"].FirstOrDefault();
+                if (string.IsNullOrEmpty(authHeader) || !_pubBusiness.IsValidAuth(mainComId, authHeader))
+                {
+                    return Unauthorized(new { code = 401, msg = "Invalid authorization information，请检查 MainComId 和 Token" });
+                }
+            }
+
+            try
+            {
+                // 5. 获取安全的文件名（保留原始文件名，防止路径遍历）
+                var originalFileName = Path.GetFileName(file.FileName);
+                var safeFileName = string.Concat(originalFileName.Split(Path.GetInvalidFileNameChars()));
+
+                // 6. 构建存储路径：ContentRootPath/MailTemplate/{MainComId}/
+                var templateFolder = Path.Combine(_webHostEnvironment.ContentRootPath, "MailTemplate", mainComId);
+                if (!Directory.Exists(templateFolder))
+                {
+                    Directory.CreateDirectory(templateFolder);
+                }
+
+                var filePath = Path.Combine(templateFolder, safeFileName);
+
+                // 7. 保存文件（存在则覆盖）
+                using (var stream = new FileStream(filePath, FileMode.Create))
+                {
+                    await file.CopyToAsync(stream);
+                }
+
+                // 8. 读取文件内容以便前端加载到编辑器
+                string fileContent = System.IO.File.ReadAllText(filePath, Encoding.UTF8);
+                 
+                _logger.LogInformation("The template was uploaded successfully：{FilePath}，MainComId：{MainComId}", filePath, mainComId);
+
+                // 9. 返回成功信息及文件内容
+                return Ok(new
+                {
+                    code = 0,
+                    msg = "模板上傳成功！已自動加載到編輯器",
+                    fileName = safeFileName,
+                    content = fileContent,
+                    path = $"/MailTemplate/{mainComId}/{safeFileName}"
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "上傳模板時發生異常，MainComId：{MainComId}", mainComId);
+                return StatusCode(500, new { code = 500, msg = $"Upload failed：{ex.Message}" });
+            }
+        }
+
+        [HttpGet]
+        public IActionResult GetTemplateList(string mainComId, string token)
+        {
+            // 参数和认证验证（同上，略）
+            if (string.IsNullOrEmpty(mainComId)) return BadRequest(new { code = 1, msg = "Miss mainComId" });
+            // ... 认证验证代码 ...
+
+            var templates = new List<object>();
+
+            // 1. 公共模板：/MailTemplate/ 根目录下的文件（排除子文件夹）
+            var rootTemplateDir = Path.Combine(_webHostEnvironment.ContentRootPath, "MailTemplate");
+            if (Directory.Exists(rootTemplateDir))
+            {
+                // 只获取根目录下的文件，不包含子目录
+                var rootFiles = Directory.GetFiles(rootTemplateDir, "*.*")
+                    .Where(f => new[] { ".html", ".htm", ".txt" }.Contains(Path.GetExtension(f).ToLower()))
+                    .Select(f => new
+                    {
+                        name = Path.GetFileName(f),
+                        // 注意：path 参数只传文件名，不带路径前缀
+                        url = Url.Action("GetTemplateContent", "Home", new { path = Path.GetFileName(f), mainComId, token }, Request.Scheme),
+                        type = "public"
+                    });
+                foreach (var file in rootFiles)
+                {
+                    templates.Add(new { label = file.name, value = file.url, type = "public" });
+                }
+            }
+
+            // 2. 商家模板：/MailTemplate/{mainComId}/ 子目录
+            var companyTemplateDir = Path.Combine(_webHostEnvironment.ContentRootPath, "MailTemplate", mainComId);
+            if (Directory.Exists(companyTemplateDir))
+            {
+                var companyFiles = Directory.GetFiles(companyTemplateDir, "*.*")
+                    .Where(f => new[] { ".html", ".htm", ".txt" }.Contains(Path.GetExtension(f).ToLower()))
+                    .Select(f => new
+                    {
+                        name = Path.GetFileName(f),
+                        // 注意：path 参数传递 "MainComId/文件名" 格式
+                        url = Url.Action("GetTemplateContent", "Home", new { path = $"{mainComId}/{Path.GetFileName(f)}", mainComId, token }, Request.Scheme),
+                        type = "company"
+                    });
+                foreach (var file in companyFiles)
+                {
+                    templates.Add(new { label = file.name, value = file.url, type = "company" });
+                }
+            }
+
+            return Ok(new { code = 0, data = templates });
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetTemplateContent(string path, string mainComId, string token)
+        {
+            if (string.IsNullOrEmpty(path) || string.IsNullOrEmpty(mainComId))
+                return BadRequest(new { code = 1, msg = "Missing parameters" });
+
+            // 认证验证（略）...
+
+            // 安全校验：禁止路径遍历
+            path = path.Replace("..", "").TrimStart('/');
+            var allowedExtensions = new[] { ".html", ".htm", ".txt" };
+            var extension = Path.GetExtension(path).ToLower();
+            if (!allowedExtensions.Contains(extension))
+                return BadRequest(new { code = 1, msg = "Unsupported file types" });
+
+            string fullPath;
+            // 判断是公共模板（path 不包含 '/'）还是商家模板（path 包含 '/'）
+            if (path.Contains('/'))
+            {
+                // 商家模板：格式 "MainComId/filename"
+                var parts = path.Split('/');
+                if (parts.Length != 2 || parts[0] != mainComId)
+                    return BadRequest(new { code = 1, msg = "Path does not match merchant ID(MainComId)" });
+                fullPath = Path.Combine(_webHostEnvironment.ContentRootPath, "MailTemplate", path);
+            }
+            else
+            {
+                // 公共模板：直接文件名，位于 MailTemplate 根目录
+                fullPath = Path.Combine(_webHostEnvironment.ContentRootPath, "MailTemplate", path);
+            }
+
+            if (!System.IO.File.Exists(fullPath))
+                return NotFound(new { code = 404, msg = "Template file does not exist" });
+
+            try
+            {
+                var content = await System.IO.File.ReadAllTextAsync(fullPath, Encoding.UTF8);
+                return Ok(new { code = 0, content });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to read template file：{Path}", fullPath);
+                return StatusCode(500, new { code = 500, msg = "Failed to read template file" });
+            }
         }
     }
 }

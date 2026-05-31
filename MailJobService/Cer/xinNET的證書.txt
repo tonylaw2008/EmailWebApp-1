@@ -1,0 +1,2 @@
+xinNET的證書.txt
+E:\SERVER_SETTING\pow_cer_xguard_hk\IIS
